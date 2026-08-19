@@ -26,29 +26,30 @@ export interface UtfallOutcome {
   repairHours: number;
   facility: FacilityType;
   capability: string;
+  /** i18n key — the sim never holds display text. */
   label: string;
   sparePart?: SparePartId;
 }
 
 /** Table A — loading / fuelling / weapon hanging / startup BIT. @source DECK p.11 */
 export const UTFALL_A: readonly UtfallOutcome[] = [
-  { roll: 1, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "AU Steg 1",   label: "Snabbt LRU-byte",            sparePart: "computer" },
-  { roll: 2, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "minor_workshop", capability: "AU Steg 2/3", label: "Snabbt LRU-byte",            sparePart: "computer" },
-  { roll: 3, serviceable: true,  kind: "complex_lru",     repairHours: 6,  facility: "major_workshop", capability: "AU Steg 4",   label: "Komplext LRU-byte",          sparePart: "radar" },
-  { roll: 4, serviceable: true,  kind: "direct_repair",   repairHours: 16, facility: "major_workshop", capability: "Kompositrep", label: "Direktreparation",           sparePart: "hydraulic" },
-  { roll: 5, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "Felsökning liten" },
-  { roll: 6, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "Felsökning liten" },
+  { roll: 1, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "AU Steg 1",   label: "job.quickLru",            sparePart: "computer" },
+  { roll: 2, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "minor_workshop", capability: "AU Steg 2/3", label: "job.quickLru",            sparePart: "computer" },
+  { roll: 3, serviceable: true,  kind: "complex_lru",     repairHours: 6,  facility: "major_workshop", capability: "AU Steg 4",   label: "job.complexLru",          sparePart: "radar" },
+  { roll: 4, serviceable: true,  kind: "direct_repair",   repairHours: 16, facility: "major_workshop", capability: "Kompositrep", label: "job.directRepair",           sparePart: "hydraulic" },
+  { roll: 5, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "job.troubleshootSmall" },
+  { roll: 6, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "job.troubleshootSmall" },
 ] as const;
 
 /** Table B — reception / post-mission. @source DECK p.11
  *  Deck status column: rolls 1–4 "OK", rolls 5–6 "Avhj" (unserviceable). */
 export const UTFALL_B: readonly UtfallOutcome[] = [
-  { roll: 1, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "Hjulbyte",    label: "Hjulbyte efter landning",    sparePart: "wheel" },
-  { roll: 2, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "AU Steg 1",   label: "LRU-byte, sensorfel",        sparePart: "radar" },
-  { roll: 3, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "minor_workshop", capability: "AU Steg 2/3", label: "Snabbt LRU-byte",            sparePart: "computer" },
-  { roll: 4, serviceable: true,  kind: "complex_lru",     repairHours: 6,  facility: "major_workshop", capability: "AU Steg 4",   label: "Komplext LRU-byte",          sparePart: "radar" },
-  { roll: 5, serviceable: false, kind: "direct_repair",   repairHours: 16, facility: "major_workshop", capability: "Kompositrep", label: "Direktreparation",           sparePart: "hydraulic" },
-  { roll: 6, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "Felsökning, EW-system" },
+  { roll: 1, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "Hjulbyte",    label: "job.wheelChange",    sparePart: "wheel" },
+  { roll: 2, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "service_bay",    capability: "AU Steg 1",   label: "job.lruSensor",        sparePart: "radar" },
+  { roll: 3, serviceable: true,  kind: "quick_lru",       repairHours: 2,  facility: "minor_workshop", capability: "AU Steg 2/3", label: "job.quickLru",            sparePart: "computer" },
+  { roll: 4, serviceable: true,  kind: "complex_lru",     repairHours: 6,  facility: "major_workshop", capability: "AU Steg 4",   label: "job.complexLru",          sparePart: "radar" },
+  { roll: 5, serviceable: false, kind: "direct_repair",   repairHours: 16, facility: "major_workshop", capability: "Kompositrep", label: "job.directRepair",           sparePart: "hydraulic" },
+  { roll: 6, serviceable: false, kind: "troubleshooting", repairHours: 4,  facility: "service_bay",    capability: "FK Steg 1–3", label: "job.troubleshootEw" },
 ] as const;
 
 /** Weapon loss percentage by roll. @source DECK p.11 table C */
@@ -83,23 +84,16 @@ export function applyExtraTime(nominalHours: number, rng: Rng): { hours: number;
   return { hours: nominalHours * (1 + extraPct / 100), extraPct };
 }
 
-export const MAINTENANCE_LABEL: Record<MaintenanceKind, string> = {
-  quick_lru: "Snabbt LRU-byte",
-  complex_lru: "Komplext LRU-byte",
-  direct_repair: "Direktreparation",
-  troubleshooting: "Felsökning",
-  scheduled_service: "Planerad service",
+/** i18n keys for facility levels and spare parts — resolved by the UI. */
+export const FACILITY_LABEL_KEY: Record<FacilityType, string> = {
+  service_bay: "facility.service_bay",
+  minor_workshop: "facility.minor_workshop",
+  major_workshop: "facility.major_workshop",
 };
 
-export const FACILITY_LABEL: Record<FacilityType, string> = {
-  service_bay: "Serviceplats",
-  minor_workshop: "Lätt verkstad",
-  major_workshop: "Tung verkstad",
-};
-
-export const SPARE_LABEL: Record<SparePartId, string> = {
-  computer: "Datorenhet",
-  radar: "Radarmodul",
-  hydraulic: "Hydraulenhet",
-  wheel: "Hjul",
+export const SPARE_LABEL_KEY: Record<SparePartId, string> = {
+  computer: "spare.computer",
+  radar: "spare.radar",
+  hydraulic: "spare.hydraulic",
+  wheel: "spare.wheel",
 };

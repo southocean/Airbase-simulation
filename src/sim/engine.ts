@@ -33,9 +33,10 @@ import {
   type FacilityType,
 
 } from "./tables";
-import { braking, crosswindKts, stepWeather, PRECIP_LABEL, type WeatherState } from "./weather";
+import { braking, crosswindKts, stepWeather, type WeatherState } from "./weather";
 import { solarState } from "./solar";
 import { applyPolicy } from "./policy";
+import { msg, type Msg } from "@/i18n";
 import type { Aircraft, MaintenanceJob, Mission, SimEvent, SimState } from "./types";
 import { isAirborne, isInMaintenance, isMissionCapable } from "./types";
 
@@ -85,9 +86,9 @@ export function logEvent(
   state: SimState,
   severity: SimEvent["severity"],
   channel: SimEvent["channel"],
-  message: string,
+  m: Msg,
 ): void {
-  state.events.unshift({ id: state.nextEventId++, atHours: state.hours, severity, channel, message });
+  state.events.unshift({ id: state.nextEventId++, atHours: state.hours, severity, channel, msg: m });
   if (state.events.length > 400) state.events.length = 400;
 }
 
@@ -112,21 +113,21 @@ export function prepEnvMultiplier(state: SimState): number {
 }
 
 /** Is the field usable for launch/recovery right now, and why not? */
-export function fieldStatus(state: SimState): { open: boolean; reason: string | null } {
+export function fieldStatus(state: SimState): { open: boolean; reason: Msg | null } {
   if (state.runwayClosedUntil !== null && state.hours < state.runwayClosedUntil) {
-    return { open: false, reason: "BANA STÄNGD — snöröjning" };
+    return { open: false, reason: msg("field.runwayClosed") };
   }
   const w = state.weather;
   const xw = crosswindKts(w, state.config.runwayHeadingDeg);
   // Use the most restrictive limit in the fleet so the gate is fleet-wide.
   const limit = Math.min(...state.config.fleet.map((g) => AIRCRAFT_SPECS[g.type].crosswindLimitKts));
   if (xw > limit * ENV_EFFECTS.crosswindHoldFactor) {
-    return { open: false, reason: `SIDVIND ${xw.toFixed(0)} kt > ${limit} kt` };
+    return { open: false, reason: msg("field.crosswind", { xw: xw.toFixed(0), limit }) };
   }
   const minCeil = Math.min(...state.config.fleet.map((g) => AIRCRAFT_SPECS[g.type].minCeilingFt));
   const minVis = Math.min(...state.config.fleet.map((g) => AIRCRAFT_SPECS[g.type].minVisibilityM));
-  if (w.ceilingFt < minCeil) return { open: false, reason: `MOLNBAS ${w.ceilingFt.toFixed(0)} ft` };
-  if (w.visibilityM < minVis) return { open: false, reason: `SIKT ${w.visibilityM.toFixed(0)} m` };
+  if (w.ceilingFt < minCeil) return { open: false, reason: msg("field.ceiling", { ft: w.ceilingFt.toFixed(0) }) };
+  if (w.visibilityM < minVis) return { open: false, reason: msg("field.visibility", { m: w.visibilityM.toFixed(0) }) };
   return { open: true, reason: null };
 }
 
@@ -219,9 +220,9 @@ function stepEnvironment(state: SimState, dt: number): void {
   // types — otherwise a temperature hovering near zero fills the log with
   // sleet/freezing-rain churn and buries the operationally relevant events.
   if (prevPrecip === "none" && next.w.precip !== "none") {
-    logEvent(state, "info", "weather", `${PRECIP_LABEL[next.w.precip]} — ${next.w.precipRate.toFixed(1)} mm/h`);
+    logEvent(state, "info", "weather", msg("ev.precipStart", { type: `precip.${next.w.precip}`, rate: next.w.precipRate.toFixed(1) }));
   } else if (prevPrecip !== "none" && next.w.precip === "none") {
-    logEvent(state, "ok", "weather", "Nedbörden upphörde");
+    logEvent(state, "ok", "weather", msg("ev.precipEnd"));
   }
 
   state.solar = solarState(state.dayOfYear, state.hourOfDay, state.config.latDeg, state.config.lonDeg);
@@ -238,7 +239,7 @@ function stepEnvironment(state: SimState, dt: number): void {
       state,
       "warning",
       "weather",
-      `Banan stängd för snöröjning i ${(hrs * 60).toFixed(0)} min (${braking(state.weather).label} bromsverkan)`,
+      msg("ev.runwayClosed", { mins: (hrs * 60).toFixed(0), braking: braking(state.weather).labelKey }),
     );
   }
 
@@ -246,9 +247,9 @@ function stepEnvironment(state: SimState, dt: number): void {
   const wasHold = state.weatherHold;
   state.weatherHold = !field.open;
   if (state.weatherHold && !wasHold) {
-    logEvent(state, "warning", "weather", `Startförbud: ${field.reason}`);
+    logEvent(state, "warning", "weather", msg("ev.launchBan", { reason: field.reason ? field.reason.k : "" }));
   } else if (!state.weatherHold && wasHold) {
-    logEvent(state, "ok", "weather", "Väderminima uppfyllda — start åter tillåten");
+    logEvent(state, "ok", "weather", msg("ev.minimaMet"));
   }
   if (state.weatherHold) state.kpi.weatherHoldHours += dt;
 }
@@ -260,7 +261,7 @@ function stepCrew(state: SimState, dt: number): void {
     if (c.onShift !== shiftIdx) {
       c.onShift = shiftIdx as 1 | 2;
       c.fatigue = Math.max(0, c.fatigue - 0.55);
-      logEvent(state, "info", "crew", `Skiftbyte — ${c.label} skift ${shiftIdx}`);
+      logEvent(state, "info", "crew", msg("ev.shiftChange", { trade: `crew.${c.id}`, n: shiftIdx }));
     }
     // Fatigue accrues with load, not merely with time on shift.
     const onDuty = Math.max(1, Math.floor(c.total / 2));
@@ -278,10 +279,10 @@ function stepLogistics(state: SimState, dt: number): void {
       for (const _ of arrived) {
         // Error class 4: a delivery can arrive short.
         if (rng.chance(RELIABILITY.resupplyLateProb * 0.4)) {
-          logEvent(state, "warning", "logistics", `${p.label}: leverans kom ofullständig`);
+          logEvent(state, "warning", "logistics", msg("ev.deliveryShort", { part: `spare.${p.id}` }));
         } else {
           p.qty = Math.min(p.max, p.qty + 1);
-          logEvent(state, "ok", "logistics", `${p.label} inlevererad — lager ${p.qty}/${p.max}`);
+          logEvent(state, "ok", "logistics", msg("ev.deliveryOk", { part: `spare.${p.id}`, qty: p.qty, max: p.max }));
         }
       }
     }
@@ -331,7 +332,7 @@ function stepDemand(state: SimState, dt: number): void {
     status: "pending",
   });
   state.kpi.sortiesTasked += chosen.count;
-  logEvent(state, "info", "mission", `Ny ATO-rad: ${chosen.t} — ${chosen.count} × ${chosen.ac}`);
+  logEvent(state, "info", "mission", msg("ev.newAto", { type: `mission.${chosen.t}`, count: chosen.count, ac: chosen.ac }));
 }
 
 function releaseSlot(state: SimState, ac: Aircraft): void {
@@ -357,7 +358,7 @@ function raiseJob(
 ): void {
   ac.job = { ...job, doneHours: 0, active: false, raisedAtHours: state.hours };
   ac.status = "unavailable";
-  ac.activity = `Väntar: ${job.label}`;
+  ac.activity = msg("act.waiting", { what: job.label });
   ac.activityEndsAt = null;
 }
 
@@ -412,7 +413,7 @@ function promoteDeferred(state: SimState, ac: Aircraft, reason: string): void {
   ac.deferredDefects.sort((a, b) => (a.deferUntilHours ?? 0) - (b.deferUntilHours ?? 0));
   const job = ac.deferredDefects.shift()!;
   state.kpi.forcedGroundings++;
-  logEvent(state, "warning", "maintenance", `${ac.tail}: ${job.label} måste åtgärdas — ${reason}`);
+  logEvent(state, "warning", "maintenance", msg("ev.deferredDue", { tail: ac.tail, label: job.label, reason }));
   raiseJob(state, ac, job);
 }
 
@@ -464,7 +465,7 @@ function beginMaintenance(state: SimState, ac: Aircraft): void {
   job.active = true;
   job.blockedBy = undefined;
   ac.status = "under_maintenance";
-  ac.activity = job.label;
+  ac.activity = msg(job.label);
   ac.activityEndsAt = state.hours + (job.totalHours - job.doneHours);
 }
 
@@ -512,11 +513,9 @@ function stepAircraft(state: SimState, dt: number): void {
         if (ac.job) {
           ac.avoidableWaitHours += dt;
           state.kpi.avoidableWaitHours += dt;
-          ac.activity = `Väntar: ${ac.job.blockedBy === "part"
-            ? "reservdel"
-            : ac.job.blockedBy === "crew"
-              ? "personal"
-              : "underhållsplats"}`;
+          ac.activity = msg("act.waiting", {
+            what: ac.job.blockedBy === "part" ? "act.part" : ac.job.blockedBy === "crew" ? "act.crew" : "act.bay",
+          });
           // Bay acquisition happens in assignBays(), in policy-determined order.
         } else {
           ac.status = "ready";
@@ -542,7 +541,7 @@ function stepAircraft(state: SimState, dt: number): void {
           ac.status = "ready";
           ac.activity = null;
           ac.activityEndsAt = null;
-          logEvent(state, "ok", "maintenance", `${ac.tail} klar efter ${job.label} (${job.totalHours.toFixed(1)} h)`);
+          logEvent(state, "ok", "maintenance", msg("ev.maintDone", { tail: ac.tail, label: job.label, hours: job.totalHours.toFixed(1) }));
         }
         break;
       }
@@ -553,20 +552,20 @@ function stepAircraft(state: SimState, dt: number): void {
         if (slotIdx === null) {
           ac.avoidableWaitHours += dt;
           state.kpi.avoidableWaitHours += dt;
-          ac.activity = "Väntar: klargöringsplats";
+          ac.activity = msg("act.waiting", { what: "act.prepSlot" });
           break;
         }
         if (!crewAvailable(state, PERSONNEL_PER_TASK.prep)) {
           ac.avoidableWaitHours += dt;
           state.kpi.avoidableWaitHours += dt;
-          ac.activity = "Väntar: klargöringstropp";
+          ac.activity = msg("act.waiting", { what: "act.prepTeam" });
           break;
         }
         const s = spec(ac);
         if (state.fuelM3 < s.fuelM3) {
           ac.avoidableWaitHours += dt;
           state.kpi.avoidableWaitHours += dt;
-          ac.activity = "Väntar: bränsle";
+          ac.activity = msg("act.waiting", { what: "act.fuel" });
           break;
         }
 
@@ -575,7 +574,7 @@ function stepAircraft(state: SimState, dt: number): void {
           const down = sampleDuration(RELIABILITY.gseRepairHours, durRng, 0.2);
           state.slots[slotIdx].gseDownUntil = state.hours + down;
           state.kpi.gseFailures++;
-          logEvent(state, "warning", "maintenance", `Markutrustning ur funktion på plats ${slotIdx + 1} (${(down * 60).toFixed(0)} min)`);
+          logEvent(state, "warning", "maintenance", msg("ev.gseFault", { slot: slotIdx + 1, mins: (down * 60).toFixed(0) }));
           break;
         }
 
@@ -588,7 +587,7 @@ function stepAircraft(state: SimState, dt: number): void {
         if (state.weather.icingRisk > ENV_EFFECTS.deiceThreshold) {
           const deice = sampleDuration(ENV_EFFECTS.deiceMinutes, durRng, 4);
           mins += deice;
-          logEvent(state, "info", "weather", `${ac.tail}: avisning +${deice.toFixed(0)} min (isrisk ${(state.weather.icingRisk * 100).toFixed(0)} %)`);
+          logEvent(state, "info", "weather", msg("ev.deice", { tail: ac.tail, mins: deice.toFixed(0), risk: (state.weather.icingRisk * 100).toFixed(0) }));
         }
 
         state.fuelM3 -= s.fuelM3;
@@ -600,7 +599,7 @@ function stepAircraft(state: SimState, dt: number): void {
         }
 
         ac.status = "in_preparation";
-        ac.activity = "Klargöring";
+        ac.activity = msg("act.turnaround");
         ac.activityEndsAt = state.hours + mins / 60;
         break;
       }
@@ -614,9 +613,9 @@ function stepAircraft(state: SimState, dt: number): void {
           if (humanRng.chance(humanErrorProb(state))) {
             state.kpi.humanErrors++;
             const redo = sampleDuration({ kind: "pert", min: 10, mode: 22, max: 55 }, durRng, 5);
-            logEvent(state, "warning", "crew", `${ac.tail}: handhavandefel vid klargöring — ${redo.toFixed(0)} min omarbete`);
+            logEvent(state, "warning", "crew", msg("ev.humanError", { tail: ac.tail, mins: redo.toFixed(0) }));
             ac.status = "allocated";
-            ac.activity = "Omarbete efter fel";
+            ac.activity = msg("act.rework");
             break;
           }
 
@@ -626,7 +625,7 @@ function stepAircraft(state: SimState, dt: number): void {
           const outcome = hasDefect ? rollUtfallA(utfallRng) : null;
           if (outcome && !outcome.serviceable) {
             const { hours, extraPct } = applyExtraTime(outcome.repairHours, utfallRng);
-            logEvent(state, "critical", "maintenance", `${ac.tail}: BIT-fel — ${outcome.label} (${hours.toFixed(1)} h${extraPct ? `, T++${extraPct}%` : ""})`);
+            logEvent(state, "critical", "maintenance", msg("ev.bitFault", { tail: ac.tail, label: outcome.label, hours: hours.toFixed(1), extra: extraPct ? `, T++${extraPct}%` : "" }));
             raiseJob(state, ac, {
               kind: outcome.kind,
               label: outcome.label,
@@ -647,7 +646,7 @@ function stepAircraft(state: SimState, dt: number): void {
           if (outcome) deferDefect(state, ac, outcome2job(outcome, utfallRng));
 
           ac.status = "awaiting_launch";
-          ac.activity = "Klar för start";
+          ac.activity = msg("act.readyToLaunch");
           ac.activityEndsAt = null;
         }
         break;
@@ -656,20 +655,20 @@ function stepAircraft(state: SimState, dt: number): void {
       case "awaiting_launch": {
         if (!field.open) {
           // Held by weather. Not "avoidable" — no plan makes the crosswind go away.
-          ac.activity = `Håller: ${field.reason}`;
+          ac.activity = msg("act.holding", { reason: field.reason ? field.reason.k : "" });
           break;
         }
         const s = spec(ac);
         const dur = sampleDuration(s.sortieHours, durRng, 0.3);
         ac.status = "on_mission";
-        ac.activity = "Uppdrag";
+        ac.activity = msg("act.mission");
         ac.activityEndsAt = state.hours + dur;
         ac.sorties++;
         state.kpi.sortiesFlown++;
         const m = state.missions.find((x) => x.id === ac.missionId);
         if (m && m.status === "assigned") {
           m.status = "launched";
-          logEvent(state, "ok", "mission", `${m.label} startade — ${m.assigned.length} flygplan`);
+          logEvent(state, "ok", "mission", msg("ev.launched", { label: m.label, n: m.assigned.length }));
         }
         break;
       }
@@ -677,7 +676,7 @@ function stepAircraft(state: SimState, dt: number): void {
       case "on_mission": {
         if (ac.activityEndsAt !== null && state.hours >= ac.activityEndsAt) {
           ac.status = "returning";
-          ac.activity = "Återflygning";
+          ac.activity = msg("act.returnFlight");
           ac.activityEndsAt = state.hours + 0.25;
         } else {
           // Error class 1: technical failure in flight, as a proper hazard rate.
@@ -689,9 +688,9 @@ function stepAircraft(state: SimState, dt: number): void {
           if (failRng.chance(p)) {
             state.kpi.technicalFailures++;
             ac.health = Math.max(20, ac.health - 10);
-            logEvent(state, "warning", "maintenance", `${ac.tail}: systemfel i luften — avbryter uppdrag`);
+            logEvent(state, "warning", "maintenance", msg("ev.airFail", { tail: ac.tail }));
             ac.status = "returning";
-            ac.activity = "Nödåterflygning";
+            ac.activity = msg("act.emergencyReturn");
             ac.activityEndsAt = state.hours + 0.2;
           }
         }
@@ -703,7 +702,7 @@ function stepAircraft(state: SimState, dt: number): void {
           if (!field.open) {
             // A returning aircraft cannot simply wait — this is the real
             // operational bite of weather, and worth showing explicitly.
-            ac.activity = `Väntar på inflygning: ${field.reason}`;
+            ac.activity = msg("act.awaitingApproach", { reason: field.reason ? field.reason.k : "" });
             break;
           }
           const s = spec(ac);
@@ -715,7 +714,7 @@ function stepAircraft(state: SimState, dt: number): void {
           ac.lastLandingAt = state.hours;
           ac.munitions = 0;
           ac.status = "recovering";
-          ac.activity = "Mottagning";
+          ac.activity = msg("act.reception");
           ac.activityEndsAt = state.hours + (sampleDuration(s.receptionMinutes, durRng, 6) * prepEnvMultiplier(state)) / 60;
 
           const m = state.missions.find((x) => x.id === ac.missionId);
@@ -724,7 +723,7 @@ function stepAircraft(state: SimState, dt: number): void {
             if (!stillOut) {
               m.status = "complete";
               state.kpi.missionsComplete++;
-              logEvent(state, "ok", "mission", `${m.label} genomfört`);
+              logEvent(state, "ok", "mission", msg("ev.complete", { label: m.label }));
             }
           }
           ac.missionId = null;
@@ -740,7 +739,7 @@ function stepAircraft(state: SimState, dt: number): void {
           const weaponLoss = WEAPON_LOSS_PCT[utfallRng.roll(6) - 1];
           if (outcome && !outcome.serviceable) {
             const { hours, extraPct } = applyExtraTime(outcome.repairHours, utfallRng);
-            logEvent(state, "warning", "maintenance", `${ac.tail}: mottagningsanmärkning — ${outcome.label} (${hours.toFixed(1)} h)`);
+            logEvent(state, "warning", "maintenance", msg("ev.reception", { tail: ac.tail, label: outcome.label, hours: hours.toFixed(1) }));
             raiseJob(state, ac, {
               kind: outcome.kind,
               label: outcome.label,
@@ -769,7 +768,7 @@ function stepAircraft(state: SimState, dt: number): void {
             // This is the consequence that makes preventive maintenance rational.
             // Without it, deferring service is free and no planner can beat a
             // policy that simply flies everything until it drops.
-            logEvent(state, "critical", "maintenance", `${ac.tail}: nådde 100 h-gräns — oplanerad service, ej luftvärdig`);
+            logEvent(state, "critical", "maintenance", msg("ev.serviceLimit", { tail: ac.tail }));
             raiseJob(state, ac, {
               kind: "scheduled_service",
               label: "Oplanerad service (100 h)",
@@ -801,11 +800,11 @@ function stepAircraft(state: SimState, dt: number): void {
         // operator chose the moment. This is the cost the baseline pays for never
         // using idle bay capacity.
         if (ac.deferredDefects.length >= MAX_DEFERRED) {
-          promoteDeferred(state, ac, `${MAX_DEFERRED} uppskjutna anmärkningar`);
+          promoteDeferred(state, ac, "ev.deferredMax");
         } else if (ac.deferredDefects.some((d) => (d.deferUntilHours ?? Infinity) <= state.hours)) {
-          promoteDeferred(state, ac, "tidsfrist överskriden");
+          promoteDeferred(state, ac, "ev.deferredExpired");
         } else {
-          ac.activity = ac.deferredDefects.length > 0 ? `${ac.deferredDefects.length} uppskjutna anm.` : null;
+          ac.activity = ac.deferredDefects.length > 0 ? msg("act.deferredCount", { n: ac.deferredDefects.length }) : null;
         }
         break;
       }
@@ -837,7 +836,7 @@ function stepKpi(state: SimState, dt: number): void {
         }
       }
       m.assigned = [];
-      logEvent(state, "critical", "mission", `${m.label} EJ GENOMFÖRT — ${m.failReason}`);
+      logEvent(state, "critical", "mission", msg("ev.failed", { label: m.label, reason: m.failReason === "weather" ? "ev.failWeather" : "ev.failResources" }));
     }
   }
 

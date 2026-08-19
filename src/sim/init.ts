@@ -3,7 +3,7 @@
  */
 import { createRng, deriveSeed } from "./rng";
 import { AIRCRAFT_SPECS, BASE_CAPACITY, SERVICE_INTERVAL_HOURS, type AircraftTypeId } from "./params";
-import { SPARE_LABEL, type FacilityType, type SparePartId } from "./tables";
+import { SPARE_LABEL_KEY, type FacilityType, type SparePartId } from "./tables";
 import { initWeather } from "./weather";
 import { solarState } from "./solar";
 import type { Kpi, SimConfig, SimState } from "./types";
@@ -115,7 +115,7 @@ export function createSim(config: SimConfig): SimState {
   const spareIds: SparePartId[] = ["computer", "radar", "hydraulic", "wheel"];
   const spares = spareIds.map((id) => ({
     id,
-    label: SPARE_LABEL[id],
+    label: SPARE_LABEL_KEY[id],
     // Deliberately thin initial stock: the deck (p.15) is explicit that UE is
     // limited and that shortage consequences are the point of the exercise.
     qty: id === "wheel" ? 6 : 3,
@@ -125,9 +125,9 @@ export function createSim(config: SimConfig): SimState {
   }));
 
   const crew: SimState["crew"] = [
-    { id: "mech", label: "Flygmekaniker", total: 24, busy: 0, fatigue: 0.1, onShift: 1 },
-    { id: "tech", label: "Tekniker avionik", total: 10, busy: 0, fatigue: 0.1, onShift: 1 },
-    { id: "arms", label: "Vapensmed", total: 8, busy: 0, fatigue: 0.1, onShift: 1 },
+    { id: "mech", label: "crew.mech", total: 24, busy: 0, fatigue: 0.1, onShift: 1 },
+    { id: "tech", label: "crew.tech", total: 10, busy: 0, fatigue: 0.1, onShift: 1 },
+    { id: "arms", label: "crew.arms", total: 8, busy: 0, fatigue: 0.1, onShift: 1 },
   ];
 
   const weatherRng = createRng(deriveSeed(cfg.seed, "weather"));

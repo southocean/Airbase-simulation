@@ -229,17 +229,18 @@ export function headwindKts(w: Weather, runwayHeadingDeg: number): number {
   return w.windKts * Math.cos(delta * (Math.PI / 180));
 }
 
-export function braking(w: Weather): { label: string; factor: number } {
-  if (w.runwayContamMm > 25) return { label: "DÅLIG", factor: 0.45 };
-  if (w.runwayContamMm > 6) return { label: "MEDEL", factor: 0.65 };
-  if (w.precip !== "none") return { label: "VÅT", factor: 0.85 };
-  return { label: "TORR", factor: 1 };
+export function braking(w: Weather): { labelKey: string; factor: number } {
+  if (w.runwayContamMm > 25) return { labelKey: "braking.poor", factor: 0.45 };
+  if (w.runwayContamMm > 6) return { labelKey: "braking.medium", factor: 0.65 };
+  if (w.precip !== "none") return { labelKey: "braking.wet", factor: 0.85 };
+  return { labelKey: "braking.dry", factor: 1 };
 }
 
-export const PRECIP_LABEL: Record<PrecipType, string> = {
-  none: "UPPEHÅLL",
-  rain: "REGN",
-  sleet: "SNÖBLANDAT",
-  snow: "SNÖFALL",
-  freezing_rain: "UNDERKYLT REGN",
+/** i18n keys — resolved by the UI. */
+export const PRECIP_LABEL_KEY: Record<PrecipType, string> = {
+  none: "precip.none",
+  rain: "precip.rain",
+  sleet: "precip.sleet",
+  snow: "precip.snow",
+  freezing_rain: "precip.freezing_rain",
 };

@@ -3,13 +3,14 @@ import { TEMPO } from "@/sim/params";
 import { PROVENANCE_SUMMARY } from "@/sim/params";
 import type { SimConfig } from "@/sim/types";
 import { Card, Label, ProvBadge, toneStyle, type Tone } from "./primitives";
+import { useLang } from "@/i18n/LangContext";
 import type { SimController } from "./useSimulation";
 
 const SEASONS = [
-  { label: "Vinter", day: 15, note: "~6.5 h dagsljus, isrisk", icon: Snowflake },
-  { label: "Vår", day: 105, note: "~14 h dagsljus", icon: Sun },
-  { label: "Sommar", day: 180, note: "~18 h dagsljus", icon: Sun },
-  { label: "Höst", day: 290, note: "~9.5 h, blåsigt", icon: Snowflake },
+  { key: "winter", day: 15, icon: Snowflake },
+  { key: "spring", day: 105, icon: Sun },
+  { key: "summer", day: 180, icon: Sun },
+  { key: "autumn", day: 290, icon: Snowflake },
 ];
 
 const TEMPO_TONE: Record<string, Tone> = { FRED: "green", KRIS: "amber", KRIG: "red" };
@@ -19,31 +20,32 @@ const TEMPO_TONE: Record<string, Tone> = { FRED: "green", KRIS: "amber", KRIG: "
  * a paired comparison is only valid when both sides face the same world.
  */
 export function ScenarioPanel({ ctl }: { ctl: SimController }) {
+  const { t } = useLang();
   const cfg = ctl.config;
   const set = (patch: Partial<SimConfig>) => ctl.reset(patch);
 
   return (
-    <Card title="Scenario & styrning" dense>
+    <Card title={t("sc.panel")} dense>
       <div className="flex flex-col gap-2.5">
         {/* Tempo */}
         <div className="flex flex-col gap-1">
-          <Label className="!text-[9px]">Insatstakt</Label>
+          <Label className="!text-[9px]">{t("sc.tempo")}</Label>
           <div className="grid grid-cols-3 gap-1">
-            {(Object.keys(TEMPO) as (keyof typeof TEMPO)[]).map((t) => {
-              const active = cfg.tempo === t;
+            {(Object.keys(TEMPO) as (keyof typeof TEMPO)[]).map((id) => {
+              const active = cfg.tempo === id;
               return (
                 <button
-                  key={t}
-                  onClick={() => set({ tempo: t })}
+                  key={id}
+                  onClick={() => set({ tempo: id })}
                   className="px-1.5 py-1 rounded transition-all duration-100 active:scale-95"
                   style={
                     active
-                      ? toneStyle(TEMPO_TONE[t], { bg: 0.16, border: 0.45 })
+                      ? toneStyle(TEMPO_TONE[id], { bg: 0.16, border: 0.45 })
                       : { background: "hsl(216 18% 96%)", border: "1px solid hsl(215 14% 88%)", color: "hsl(218 15% 48%)" }
                   }
                 >
-                  <div className="text-[10px] font-mono font-bold">{t}</div>
-                  <div className="text-[8px] font-mono opacity-60">{TEMPO[t].sortieDemandPerDay}/dygn</div>
+                  <div className="text-[10px] font-mono font-bold">{t(`tempo.${id}`)}</div>
+                  <div className="text-[8px] font-mono opacity-60">{t("sc.tempoRate", { n: TEMPO[id].sortieDemandPerDay })}</div>
                 </button>
               );
             })}
@@ -53,7 +55,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
         {/* Season */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            <Label className="!text-[9px]">Årstid</Label>
+            <Label className="!text-[9px]">{t("sc.season")}</Label>
             <ProvBadge tag="TIER-A" />
           </div>
           <div className="grid grid-cols-2 gap-1">
@@ -62,7 +64,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
               const Icon = s.icon;
               return (
                 <button
-                  key={s.label}
+                  key={s.key}
                   onClick={() => set({ startDayOfYear: s.day })}
                   className="px-1.5 py-1 rounded flex items-center gap-1.5 text-left transition-all duration-100 active:scale-95"
                   style={
@@ -73,8 +75,8 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
                 >
                   <Icon className="h-3 w-3 shrink-0 opacity-70" />
                   <div className="min-w-0">
-                    <div className="text-[10px] font-mono font-bold">{s.label}</div>
-                    <div className="text-[8px] font-mono opacity-60 truncate">{s.note}</div>
+                    <div className="text-[10px] font-mono font-bold">{t(`season.${s.key}`)}</div>
+                    <div className="text-[8px] font-mono opacity-60 truncate">{t(`season.${s.key}Note`)}</div>
                   </div>
                 </button>
               );
@@ -85,7 +87,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
         {/* Base type */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5">
-            <Label className="!text-[9px]">Bastyp</Label>
+            <Label className="!text-[9px]">{t("sc.baseType")}</Label>
             <ProvBadge tag="DECK" />
           </div>
           <div className="grid grid-cols-3 gap-1">
@@ -102,7 +104,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
                       : { background: "hsl(216 18% 96%)", border: "1px solid hsl(215 14% 88%)", color: "hsl(218 15% 48%)" }
                   }
                 >
-                  {b.toUpperCase()}
+                  {t(`base.${b}`)}
                 </button>
               );
             })}
@@ -111,7 +113,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
 
         {/* Seed */}
         <div className="flex flex-col gap-1">
-          <Label className="!text-[9px]">Slumpfrö — samma frö ger identisk körning</Label>
+          <Label className="!text-[9px]">{t("sc.seed")}</Label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -122,7 +124,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
             />
             <button
               onClick={() => set({ seed: Math.floor(1 + (cfg.seed * 1103515245 + 12345) % 99999999) })}
-              title="Nytt frö"
+              title={t("sc.newSeed")}
               className="p-1.5 rounded transition-all duration-100 active:scale-95"
               style={toneStyle("blue", { bg: 0.1, border: 0.3 })}
             >
@@ -133,7 +135,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
 
         {/* Jump */}
         <div className="flex flex-col gap-1">
-          <Label className="!text-[9px]">Hoppa framåt (pausat)</Label>
+          <Label className="!text-[9px]">{t("sc.jump")}</Label>
           <div className="grid grid-cols-4 gap-1">
             {[1, 6, 24, 72].map((h) => (
               <button
@@ -152,7 +154,7 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
 
         {/* Provenance legend — design principle 7.2 made visible */}
         <div className="flex flex-col gap-1">
-          <Label className="!text-[9px]">Datakvalitet i modellen</Label>
+          <Label className="!text-[9px]">{t("sc.dataQuality")}</Label>
           {PROVENANCE_SUMMARY.map((p) => (
             <div key={p.tag} className="flex items-start gap-1.5">
               <div className="shrink-0 pt-px">
@@ -160,19 +162,15 @@ export function ScenarioPanel({ ctl }: { ctl: SimController }) {
               </div>
               <div className="min-w-0">
                 <div className="text-[9px] font-mono font-bold" style={{ color: "hsl(218 15% 38%)" }}>
-                  {p.label}
+                  {t(`prov.${p.tag}`)}
                 </div>
-                <div className="text-[8px] font-mono opacity-55 leading-snug">{p.note}</div>
+                <div className="text-[8px] font-mono opacity-55 leading-snug">{t(`prov.${p.tag}.note`)}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <p className="text-[8px] font-mono leading-relaxed opacity-50">
-          Fasta tidssteg om 1 simulerad minut. Tidsskalan styr hur många steg som
-          körs per bildruta, aldrig stegets storlek — därför ger 1× och 10800×
-          identiskt resultat för samma frö.
-        </p>
+        <p className="text-[8px] font-mono leading-relaxed opacity-50">{t("sc.timeNote")}</p>
       </div>
     </Card>
   );

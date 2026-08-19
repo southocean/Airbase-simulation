@@ -9,6 +9,7 @@ import type { AircraftTypeId } from "./params";
 import type { FacilityType, MaintenanceKind, SparePartId } from "./tables";
 import type { Weather } from "./weather";
 import type { SolarState } from "./solar";
+import type { Msg } from "@/i18n";
 
 /** The nine-state aircraft lifecycle, carried over from hackathon v2 —
  *  a genuinely good model and worth reusing verbatim. */
@@ -76,8 +77,8 @@ export interface Aircraft {
   munitions: number;
   /** Sim-hour at which the current activity completes */
   activityEndsAt: number | null;
-  /** Human-readable current activity */
-  activity: string | null;
+  /** Current activity as a structured message. */
+  activity: Msg | null;
   /** Which prep slot / bay index is held, if any */
   slot: number | null;
   bay: number | null;
@@ -155,7 +156,8 @@ export interface SimEvent {
   severity: "info" | "ok" | "warning" | "critical";
   /** Which subsystem raised it — lets the UI filter */
   channel: "mission" | "maintenance" | "weather" | "logistics" | "crew" | "tool";
-  message: string;
+  /** Structured message — the core emits keys, the UI renders language. */
+  msg: Msg;
 }
 
 export interface Kpi {
@@ -251,12 +253,12 @@ export interface SimState {
 
 export interface Advice {
   id: string;
-  title: string;
-  detail: string;
+  title: Msg;
+  detail: Msg;
   /** Benefit and trade-off are mandatory — design principle §5.2, the strongest
    *  idea in either hackathon build. Never surface advice without its cost. */
-  benefit: string;
-  tradeoff: string;
+  benefit: Msg;
+  tradeoff: Msg;
   priority: "low" | "medium" | "high" | "critical";
   channel: "maintenance" | "logistics" | "crew" | "mission" | "weather";
   /** True if the tool policy actually acted on this during the run */

@@ -142,6 +142,12 @@ src/ui/           React; samples sim state, never drives it
 
 The one-way dependency matters: `sim` knows nothing about `ui`, and `policy` acts on the world only through the same actions a human has. If the tool could reach into state directly, any measured advantage would be meaningless.
 
+## Language
+
+English by default, with a Swedish toggle in the top bar (the domain vocabulary is Swedish; the audience is not necessarily). The choice persists in localStorage.
+
+The simulation core emits **structured messages** — a key plus parameters — never display strings, so `src/sim` has no opinion about language and a headless batch run has none either. Switching language re-renders the whole event history in the new language, including events generated before the switch.
+
 ## Known limitations
 
 - One base. Dispersion and rebasing between huvudbas/sidobas/reservbas are not modelled, though base type changes capacity.

@@ -25,6 +25,7 @@ import type { Rng } from "./rng";
 import { AIRCRAFT_SPECS, CREW, RELIABILITY, SERVICE_INTERVAL_HOURS, TEMPO } from "./params";
 import { nominal } from "./dist";
 import { facilityCanHandle } from "./tables";
+import { msg } from "@/i18n";
 import type { Advice, Aircraft, Mission, SimState } from "./types";
 import { isMissionCapable } from "./types";
 
@@ -190,7 +191,7 @@ function toolPolicy(state: SimState, rng: Rng): void {
         target.deferredDefects = target.deferredDefects.filter((d) => d !== startable);
         target.job = { ...startable, deferUntilHours: undefined, active: false, raisedAtHours: state.hours };
         target.status = "unavailable";
-        target.activity = `Planerad åtgärd: ${startable.label}`;
+        target.activity = msg("act.plannedAction", { label: startable.label });
         state.kpi.plannedClearances++;
         break;
       }
@@ -233,7 +234,7 @@ function toolPolicy(state: SimState, rng: Rng): void {
       const serviceHours = 8;
       dueSoon.job = {
         kind: "scheduled_service",
-        label: "Planerad service (A)",
+        label: "job.scheduledA",
         facility: "service_bay",
         capability: "AU Steg 1",
         totalHours: serviceHours,
@@ -243,7 +244,7 @@ function toolPolicy(state: SimState, rng: Rng): void {
         raisedAtHours: state.hours,
       };
       dueSoon.status = "unavailable";
-      dueSoon.activity = "Inplanerad service";
+      dueSoon.activity = msg("act.scheduledService");
     }
   }
 
@@ -277,26 +278,28 @@ export function generateAdvice(state: SimState): Advice[] {
   if (dueSoon.length > 0) {
     push({
       id: "svc",
-      title: `${dueSoon.length} flygplan nära 100 h-service`,
-      detail: `${dueSoon.slice(0, 4).map((a) => `${a.tail} (${a.hoursToService.toFixed(1)} h)`).join(", ")}. Planera in service i lucka istället för att förlora dem mitt i ett uppdrag.`,
-      benefit: "Undviker oplanerad grundning vid fel tidpunkt",
-      tradeoff: `Flygplanet otillgängligt ~${(5 * 24 * 0.18).toFixed(0)} h under service`,
+      title: msg("adv.svc.title", { n: dueSoon.length }),
+      detail: msg("adv.svc.detail", {
+        list: dueSoon.slice(0, 4).map((a) => `${a.tail} (${a.hoursToService.toFixed(1)} h)`).join(", "),
+      }),
+      benefit: msg("adv.svc.benefit"),
+      tradeoff: msg("adv.svc.tradeoff", { h: 8 }),
       priority: dueSoon.some((a) => a.hoursToService < 4) ? "critical" : "high",
       channel: "maintenance",
     });
   }
 
   // Spares below reorder point
-  for (const p of state.spares) {
-    const reorderPoint = Math.max(2, Math.ceil(p.max * 0.4));
-    if (p.qty + p.inbound.length <= reorderPoint) {
+  for (const part of state.spares) {
+    const reorderPoint = Math.max(2, Math.ceil(part.max * 0.4));
+    if (part.qty + part.inbound.length <= reorderPoint) {
       push({
-        id: `part-${p.id}`,
-        title: `${p.label} under beställningspunkt`,
-        detail: `${p.qty}/${p.max} i lager, ${p.inbound.length} på väg. Ledtid är dagar — beställning vid noll ger garanterat stopp.`,
-        benefit: "Undviker underhållsstopp i väntan på reservdel",
-        tradeoff: "Binder lagerkapital och transportkapacitet",
-        priority: p.qty === 0 ? "critical" : "high",
+        id: `part-${part.id}`,
+        title: msg("adv.part.title", { part: `spare.${part.id}` }),
+        detail: msg("adv.part.detail", { qty: part.qty, max: part.max, inbound: part.inbound.length }),
+        benefit: msg("adv.part.benefit"),
+        tradeoff: msg("adv.part.tradeoff"),
+        priority: part.qty === 0 ? "critical" : "high",
         channel: "logistics",
       });
     }
@@ -312,13 +315,27 @@ export function generateAdvice(state: SimState): Advice[] {
     }, {});
     push({
       id: "blocked",
-      title: `${blocked.length} flygplan väntar på resurs`,
-      detail: Object.entries(byReason)
-        .map(([r, n]) => `${n} × ${r === "bay" ? "underhållsplats" : r === "part" ? "reservdel" : "personal"}`)
-        .join(", ") + ". Prioritera korta LRU-jobb för att frigöra kapacitet.",
-      benefit: "Minskar undvikbar väntetid direkt",
-      tradeoff: "Skjuter upp tyngre jobb",
+      title: msg("adv.blocked.title", { n: blocked.length }),
+      detail: msg("adv.blocked.detail", {
+        list: Object.entries(byReason).map(([r, n]) => `${n} × ${r}`).join(", "),
+      }),
+      benefit: msg("adv.blocked.benefit"),
+      tradeoff: msg("adv.blocked.tradeoff"),
       priority: "high",
+      channel: "maintenance",
+    });
+  }
+
+  // Deferred-defect backlog
+  const deferredTotal = state.aircraft.reduce((s, a) => s + a.deferredDefects.length, 0);
+  if (deferredTotal >= 4) {
+    push({
+      id: "deferred",
+      title: msg("adv.deferred.title", { n: deferredTotal }),
+      detail: msg("adv.deferred.detail"),
+      benefit: msg("adv.deferred.benefit"),
+      tradeoff: msg("adv.deferred.tradeoff"),
+      priority: deferredTotal >= 8 ? "high" : "medium",
       channel: "maintenance",
     });
   }
@@ -328,10 +345,13 @@ export function generateAdvice(state: SimState): Advice[] {
   if (tired.length > 0) {
     push({
       id: "fatigue",
-      title: `Hög belastning: ${tired.map((c) => c.label).join(", ")}`,
-      detail: `Utmattning ${(tired[0].fatigue * 100).toFixed(0)} %. Felsannolikheten vid klargöring är nu ${errorMultiplier(state).toFixed(1)}× normalvärdet — skiftbyte rekommenderas.`,
-      benefit: "Lägre andel handhavandefel och omarbete",
-      tradeoff: "Kortvarigt lägre klargöringstakt under överlämning",
+      title: msg("adv.fatigue.title", { trades: tired.map((c) => c.label).join(", ") }),
+      detail: msg("adv.fatigue.detail", {
+        pct: (tired[0].fatigue * 100).toFixed(0),
+        mult: errorMultiplier(state).toFixed(1),
+      }),
+      benefit: msg("adv.fatigue.benefit"),
+      tradeoff: msg("adv.fatigue.tradeoff"),
       priority: "medium",
       channel: "crew",
     });
@@ -341,10 +361,10 @@ export function generateAdvice(state: SimState): Advice[] {
   if (state.weatherHold) {
     push({
       id: "wx",
-      title: "Väderminima ej uppfyllda",
-      detail: "Håll tilldelade flygplan i beredskap istället för att binda dem i klargöring som hinner kallna innan vädret släpper.",
-      benefit: "Bevarar klargöringskapacitet till fönstret öppnar",
-      tradeoff: "Längre svarstid när vädret väl tillåter start",
+      title: msg("adv.wx.title"),
+      detail: msg("adv.wx.detail"),
+      benefit: msg("adv.wx.benefit"),
+      tradeoff: msg("adv.wx.tradeoff"),
       priority: "high",
       channel: "weather",
     });
@@ -356,24 +376,28 @@ export function generateAdvice(state: SimState): Advice[] {
   if (daysLeft < 2.5) {
     push({
       id: "fuel",
-      title: `Bränsleuthållighet ${daysLeft.toFixed(1)} dygn`,
-      detail: `${state.fuelM3.toFixed(0)} m³ kvar vid nuvarande insatstakt (${state.config.tempo}).`,
-      benefit: "Undviker att uppdrag faller på bränslebrist",
-      tradeoff: "Kräver transportresurser som konkurrerar med reservdelar",
+      title: msg("adv.fuel.title", { days: daysLeft.toFixed(1) }),
+      detail: msg("adv.fuel.detail", { m3: state.fuelM3.toFixed(0), tempo: `tempo.${state.config.tempo}` }),
+      benefit: msg("adv.fuel.benefit"),
+      tradeoff: msg("adv.fuel.tradeoff"),
       priority: daysLeft < 1.2 ? "critical" : "high",
       channel: "logistics",
     });
   }
 
   // Unassignable demand
-  const unmet = pendingMissions(state).filter((m) => candidatesFor(state, m).length < m.requiredCount - m.assigned.length);
+  const unmet = pendingMissions(state).filter(
+    (m) => candidatesFor(state, m).length < m.requiredCount - m.assigned.length,
+  );
   if (unmet.length > 0) {
     push({
       id: "unmet",
-      title: `${unmet.length} ATO-rader utan tillräckligt underlag`,
-      detail: unmet.slice(0, 3).map((m) => `${m.label} behöver ${m.requiredCount - m.assigned.length} × ${m.requiredType}`).join("; "),
-      benefit: "Tidig varning ger tid att omfördela eller omplanera",
-      tradeoff: "Kan kräva att lägre prioriterade uppdrag stryks",
+      title: msg("adv.unmet.title", { n: unmet.length }),
+      detail: msg("adv.unmet.detail", {
+        list: unmet.slice(0, 3).map((m) => `${m.label}: ${m.requiredCount - m.assigned.length} × ${m.requiredType}`).join("; "),
+      }),
+      benefit: msg("adv.unmet.benefit"),
+      tradeoff: msg("adv.unmet.tradeoff"),
       priority: "critical",
       channel: "mission",
     });

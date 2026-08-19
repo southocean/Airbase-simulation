@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleSlash, Lightbulb } from "lucide-react";
 import type { SimState } from "@/sim/types";
 import { Card, Chip, toneStyle, TONE_HSL, type Tone } from "./primitives";
+import { useLang } from "@/i18n/LangContext";
 
 const PRIORITY_TONE: Record<string, Tone> = {
   critical: "red",
@@ -21,14 +22,15 @@ const PRIORITY_TONE: Record<string, Tone> = {
  * difference the comparison panel is measuring.
  */
 export function AdvicePanel({ state }: { state: SimState }) {
+  const { t, tm } = useLang();
   const acting = state.config.policy === "tool";
 
   return (
     <Card
-      title="Beslutsstöd"
+      title={t("adv.panel")}
       right={
         <Chip tone={acting ? "green" : "red"}>
-          {acting ? "AKTIVT" : "PASSIVT"}
+          {acting ? t("adv.active") : t("adv.passive")}
         </Chip>
       }
       dense
@@ -37,7 +39,7 @@ export function AdvicePanel({ state }: { state: SimState }) {
       {state.advice.length === 0 ? (
         <div className="flex items-center gap-2 px-2 py-3 rounded" style={toneStyle("green", { bg: 0.07 })}>
           <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="text-[10px] font-mono">Inga avvikelser — planen håller</span>
+          <span className="text-[10px] font-mono">{t("adv.none")}</span>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5 max-h-[26rem] overflow-y-auto pr-0.5">
@@ -52,42 +54,42 @@ export function AdvicePanel({ state }: { state: SimState }) {
                 <div className="flex items-start gap-1.5">
                   <Lightbulb className="h-3 w-3 mt-0.5 shrink-0 opacity-70" />
                   <span className="text-[10px] font-mono font-bold leading-snug flex-1" style={{ color: "hsl(220 63% 18%)" }}>
-                    {a.title}
+                    {tm(a.title)}
                   </span>
                   {acting ? (
                     <span
                       className="flex items-center gap-0.5 text-[8px] font-mono font-bold shrink-0 px-1 py-px rounded"
                       style={toneStyle("green", { bg: 0.15, border: 0.35 })}
                     >
-                      <CheckCircle2 className="h-2.5 w-2.5" /> GENOMFÖRD
+                      <CheckCircle2 className="h-2.5 w-2.5" /> {t("adv.applied")}
                     </span>
                   ) : (
                     <span
                       className="flex items-center gap-0.5 text-[8px] font-mono font-bold shrink-0 px-1 py-px rounded"
                       style={toneStyle("red", { bg: 0.15, border: 0.35 })}
                     >
-                      <CircleSlash className="h-2.5 w-2.5" /> IGNORERAD
+                      <CircleSlash className="h-2.5 w-2.5" /> {t("adv.ignored")}
                     </span>
                   )}
                 </div>
 
                 <p className="text-[9px] font-mono leading-relaxed" style={{ color: "hsl(218 15% 42%)" }}>
-                  {a.detail}
+                  {tm(a.detail)}
                 </p>
 
                 {/* Benefit and trade-off are mandatory, never optional. */}
                 <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8px] font-mono font-bold uppercase tracking-wide" style={{ color: `hsl(${TONE_HSL.green})` }}>
-                      Vinst
+                      {t("adv.benefit")}
                     </span>
-                    <span className="text-[9px] font-mono leading-snug opacity-70">{a.benefit}</span>
+                    <span className="text-[9px] font-mono leading-snug opacity-70">{tm(a.benefit)}</span>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[8px] font-mono font-bold uppercase tracking-wide" style={{ color: `hsl(${TONE_HSL.amber})` }}>
-                      Pris
+                      {t("adv.tradeoff")}
                     </span>
-                    <span className="text-[9px] font-mono leading-snug opacity-70">{a.tradeoff}</span>
+                    <span className="text-[9px] font-mono leading-snug opacity-70">{tm(a.tradeoff)}</span>
                   </div>
                 </div>
               </div>

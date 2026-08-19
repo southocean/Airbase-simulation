@@ -2,6 +2,7 @@ import { useState } from "react";
 import { clsx } from "clsx";
 import type { SimEvent, SimState } from "@/sim/types";
 import { Card, TONE_HSL, type Tone } from "./primitives";
+import { useLang } from "@/i18n/LangContext";
 
 const SEVERITY_TONE: Record<SimEvent["severity"], Tone> = {
   info: "blue",
@@ -10,24 +11,25 @@ const SEVERITY_TONE: Record<SimEvent["severity"], Tone> = {
   critical: "red",
 };
 
-const CHANNELS: { id: SimEvent["channel"] | "all"; label: string }[] = [
-  { id: "all", label: "ALLA" },
-  { id: "mission", label: "UPPDRAG" },
-  { id: "maintenance", label: "UH" },
-  { id: "weather", label: "VÄDER" },
-  { id: "logistics", label: "LOG" },
-  { id: "crew", label: "PERS" },
+const CHANNELS: { id: SimEvent["channel"] | "all"; key: string }[] = [
+  { id: "all", key: "log.all" },
+  { id: "mission", key: "log.mission" },
+  { id: "maintenance", key: "log.maintenance" },
+  { id: "weather", key: "log.weather" },
+  { id: "logistics", key: "log.logistics" },
+  { id: "crew", key: "log.crew" },
 ];
 
 /** The event log is the spine — everything that happens writes here, and it is
  *  the source for any after-action review. */
 export function EventLog({ state }: { state: SimState }) {
+  const { t, tm } = useLang();
   const [channel, setChannel] = useState<SimEvent["channel"] | "all">("all");
   const events = channel === "all" ? state.events : state.events.filter((e) => e.channel === channel);
 
   return (
     <Card
-      title="Händelselogg"
+      title={t("log.panel")}
       right={
         <div className="flex gap-0.5 flex-wrap justify-end">
           {CHANNELS.map((c) => (
@@ -41,7 +43,7 @@ export function EventLog({ state }: { state: SimState }) {
                   : { background: "transparent", color: "hsl(200 12% 62%)", border: "1px solid hsl(200 12% 100% / 0.14)" }
               }
             >
-              {c.label}
+              {t(c.key)}
             </button>
           ))}
         </div>
@@ -51,7 +53,7 @@ export function EventLog({ state }: { state: SimState }) {
     >
       <div className="h-full overflow-y-auto flex flex-col gap-px pr-0.5">
         {events.length === 0 ? (
-          <div className="text-[10px] font-mono opacity-40 py-3 text-center">Inga händelser</div>
+          <div className="text-[10px] font-mono opacity-40 py-3 text-center">{t("log.none")}</div>
         ) : (
           events.map((e) => {
             const tone = SEVERITY_TONE[e.severity];
@@ -67,7 +69,7 @@ export function EventLog({ state }: { state: SimState }) {
                   style={{ background: `hsl(${TONE_HSL[tone]})` }}
                 />
                 <span className="text-[9px] font-mono leading-snug flex-1" style={{ color: "hsl(218 15% 34%)" }}>
-                  {e.message}
+                  {tm(e.msg)}
                 </span>
               </div>
             );

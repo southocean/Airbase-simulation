@@ -5,6 +5,13 @@
  */
 import type { ReactNode } from "react";
 import { clsx } from "clsx";
+import { translate, type Lang } from "@/i18n";
+
+/** Primitives are used outside the React tree in a few places, so they read the
+ *  chosen language from the document rather than from context. */
+function getLang(): Lang {
+  return document.documentElement.lang === "sv" ? "sv" : "en";
+}
 
 export type Tone = "green" | "amber" | "red" | "blue" | "neutral";
 
@@ -142,15 +149,7 @@ export function ProvBadge({ tag }: { tag: string }) {
     <span
       className="px-1 py-px rounded text-[8px] font-mono font-bold tracking-wide"
       style={toneStyle(tone, { bg: 0.13, border: 0.3 })}
-      title={
-        tag === "DECK"
-          ? "Från Saabs underlag — auktoritativt"
-          : tag === "TIER-A"
-            ? "Öppna auktoritativa data"
-            : tag === "TIER-C"
-              ? "Analogi från öppen litteratur"
-              : "Antagande — kräver SME-validering"
-      }
+      title={translate(getLang(), `prov.${tag}.tip`)}
     >
       {tag}
     </span>

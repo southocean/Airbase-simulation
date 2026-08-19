@@ -4,6 +4,7 @@ import { bayUtilisation, fulfilment, meanAvailability, meanTurnaroundHours, sort
 import type { PairedRun } from "@/sim/runner";
 import type { PolicyId, SimState } from "@/sim/types";
 import { Card, Label, toneStyle, TONE_HSL, type Tone } from "./primitives";
+import { useLang } from "@/i18n/LangContext";
 
 /**
  * The effectiveness measurement — Gap C.
@@ -16,8 +17,8 @@ import { Card, Label, toneStyle, TONE_HSL, type Tone } from "./primitives";
 
 interface Metric {
   key: string;
-  label: string;
-  unit: string;
+  labelKey: string;
+  unitKey?: string;
   /** true when a HIGHER number is better */
   higherBetter: boolean;
   get: (s: SimState) => number | null;
@@ -27,40 +28,38 @@ interface Metric {
 const METRICS: Metric[] = [
   {
     key: "fulfilment",
-    label: "ATO-uppfyllnad",
-    unit: "%",
+    labelKey: "cmp.m.fulfilment",
     higherBetter: true,
     get: (s) => fulfilment(s) * 100,
     fmt: (v) => v.toFixed(1),
   },
   {
     key: "availability",
-    label: "Medeltillgänglighet",
-    unit: "fpl",
+    labelKey: "cmp.m.availability",
+    unitKey: "cmp.unit.aircraft",
     higherBetter: true,
     get: (s) => meanAvailability(s),
     fmt: (v) => v.toFixed(2),
   },
   {
     key: "sorties",
-    label: "Företag/fpl/dygn",
-    unit: "",
+    labelKey: "cmp.m.sortieRate",
     higherBetter: true,
     get: (s) => sortieRate(s),
     fmt: (v) => v.toFixed(2),
   },
   {
     key: "wait",
-    label: "Undvikbar väntetid",
-    unit: "fpl-h",
+    labelKey: "cmp.m.wait",
+    unitKey: "cmp.unit.acHours",
     higherBetter: false,
     get: (s) => s.kpi.avoidableWaitHours,
     fmt: (v) => v.toFixed(1),
   },
   {
     key: "turnaround",
-    label: "Medelomloppstid",
-    unit: "h",
+    labelKey: "cmp.m.turnaround",
+    unitKey: "cmp.unit.hours",
     higherBetter: false,
     get: (s) => meanTurnaroundHours(s),
     fmt: (v) => v.toFixed(2),
@@ -70,48 +69,42 @@ const METRICS: Metric[] = [
     // unambiguously, while the throughput metrics above stay inside run-to-run
     // noise over a week — see README.
     key: "forced",
-    label: "Tvingade grundstopp",
-    unit: "",
+    labelKey: "cmp.m.forced",
     higherBetter: false,
     get: (s) => s.kpi.forcedGroundings,
     fmt: (v) => v.toFixed(0),
   },
   {
     key: "planned",
-    label: "Planerade åtgärder",
-    unit: "",
+    labelKey: "cmp.m.planned",
     higherBetter: true,
     get: (s) => s.kpi.plannedClearances,
     fmt: (v) => v.toFixed(0),
   },
   {
     key: "deferred",
-    label: "Uppskjutna anmärkningar",
-    unit: "",
+    labelKey: "cmp.m.deferred",
     higherBetter: false,
     get: (s) => s.aircraft.reduce((acc, a) => acc + a.deferredDefects.length, 0),
     fmt: (v) => v.toFixed(0),
   },
   {
     key: "failedMissions",
-    label: "Ej genomförda uppdrag",
-    unit: "",
+    labelKey: "cmp.m.failed",
     higherBetter: false,
     get: (s) => s.kpi.missionsFailed,
     fmt: (v) => v.toFixed(0),
   },
   {
     key: "stockouts",
-    label: "Delbrist-stopp",
-    unit: "",
+    labelKey: "cmp.m.stockouts",
     higherBetter: false,
     get: (s) => s.kpi.stockouts,
     fmt: (v) => v.toFixed(0),
   },
   {
     key: "bay",
-    label: "Utnyttjande UH-plats",
-    unit: "%",
+    labelKey: "cmp.m.bayUtil",
     higherBetter: true,
     get: (s) => bayUtilisation(s) * 100,
     fmt: (v) => v.toFixed(0),
@@ -127,14 +120,15 @@ export function ComparePanel({
   focus: PolicyId;
   setFocus: (p: PolicyId) => void;
 }) {
+  const { t } = useLang();
   const warmedUp = run.tool.hours > 2;
 
   return (
     <Card
-      title="Effekt av beslutsstöd — parkörning"
+      title={t("cmp.panel")}
       right={
         <span className="text-[9px] font-mono" style={{ color: "hsl(200 12% 70%)" }}>
-          samma frö {run.config.seed} · identiskt väder
+          {t("cmp.sameSeed", { seed: run.config.seed })}
         </span>
       }
       dense
@@ -158,10 +152,10 @@ export function ComparePanel({
                 }
               >
                 <div className="text-[10px] font-mono font-bold uppercase tracking-wide">
-                  {p === "tool" ? "Med beslutsstöd" : "Utan (baslinje)"}
+                  {p === "tool" ? t("cmp.withTool") : t("cmp.withoutTool")}
                 </div>
                 <div className="text-[9px] font-mono opacity-65">
-                  {(fulfilment(s) * 100).toFixed(0)} % uppfyllnad · {s.kpi.sortiesFlown} företag
+                  {t("cmp.summary", { pct: (fulfilment(s) * 100).toFixed(0), n: s.kpi.sortiesFlown })}
                 </div>
               </button>
             );
@@ -171,10 +165,10 @@ export function ComparePanel({
         {/* Metric table */}
         <div className="flex flex-col gap-0.5">
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-1">
-            <Label className="!text-[8px]">Mått</Label>
-            <Label className="!text-[8px] text-right w-14">Utan</Label>
-            <Label className="!text-[8px] text-right w-14">Med</Label>
-            <Label className="!text-[8px] text-right w-16">Skillnad</Label>
+            <Label className="!text-[8px]">{t("cmp.metric")}</Label>
+            <Label className="!text-[8px] text-right w-14">{t("cmp.without")}</Label>
+            <Label className="!text-[8px] text-right w-14">{t("cmp.with")}</Label>
+            <Label className="!text-[8px] text-right w-16">{t("cmp.delta")}</Label>
           </div>
           {METRICS.map((m) => (
             <MetricRow key={m.key} m={m} manual={run.manual} tool={run.tool} enabled={warmedUp} />
@@ -183,7 +177,7 @@ export function ComparePanel({
 
         {!warmedUp && (
           <div className="text-[9px] font-mono opacity-50 px-1">
-            Kör minst 2 simulerade timmar innan skillnaderna är meningsfulla.
+            {t("cmp.warmup")}
           </div>
         )}
 
@@ -191,25 +185,12 @@ export function ComparePanel({
         <WaitChart run={run} />
 
         <div className="flex flex-col gap-1.5 px-1">
-          <p className="text-[9px] font-mono leading-relaxed opacity-55">
-            Baslinjen tilldelar första lediga flygplan, åtgärdar fel först när de
-            tvingar fram ett stopp och beställer reservdelar vid noll. Beslutsstödet
-            har samma handlingar och samma information — men prioriterar efter
-            deadline, tar korta jobb först i underhållskön, använder tomma
-            underhållsplatser till uppskjutna anmärkningar och beställer vid
-            beställningspunkt.
-          </p>
+          <p className="text-[9px] font-mono leading-relaxed opacity-55">{t("cmp.explain")}</p>
           <p
             className="text-[9px] font-mono leading-relaxed px-1.5 py-1 rounded"
             style={toneStyle("amber", { bg: 0.07, border: 0.2 })}
           >
-            <strong>Läs siffrorna försiktigt.</strong> En enskild körning bevisar
-            ingenting — spridningen mellan slumpfrön är stor. Över 60 parvisa frön
-            håller effekten på tillgänglighet (+3,6 %), undvikbar väntetid (−25 %)
-            och tvingade grundstopp (−49 %), medan ATO-uppfyllnaden ligger kvar inom
-            bruset: vid ~92 % finns knappt något utrymme kvar. Kör
-            <span className="font-bold"> npm test </span>
-            för siffrorna med t-värden.
+            {t("cmp.caveat")}
           </p>
         </div>
       </div>
@@ -218,6 +199,7 @@ export function ComparePanel({
 }
 
 function MetricRow({ m, manual, tool, enabled }: { m: Metric; manual: SimState; tool: SimState; enabled: boolean }) {
+  const { t } = useLang();
   const a = m.get(manual);
   const b = m.get(tool);
 
@@ -250,8 +232,8 @@ function MetricRow({ m, manual, tool, enabled }: { m: Metric; manual: SimState; 
       style={{ background: tone === "neutral" ? "transparent" : `hsl(${TONE_HSL[tone]} / 0.05)` }}
     >
       <span className="text-[10px] font-mono truncate" style={{ color: "hsl(218 15% 38%)" }}>
-        {m.label}
-        {m.unit && <span className="opacity-40"> ({m.unit})</span>}
+        {t(m.labelKey)}
+        {m.unitKey && <span className="opacity-40"> ({t(m.unitKey)})</span>}
       </span>
       <span className="text-[10px] font-mono tnum text-right w-14 opacity-70">{a === null ? "—" : m.fmt(a)}</span>
       <span className="text-[10px] font-mono font-bold tnum text-right w-14" style={{ color: "hsl(220 63% 18%)" }}>
@@ -285,11 +267,12 @@ function chartData(run: PairedRun) {
 const AXIS = { fontSize: 8, fontFamily: "JetBrains Mono, monospace", fill: "hsl(218 15% 50%)" };
 
 function FulfilmentChart({ run }: { run: PairedRun }) {
+  const { t } = useLang();
   const data = chartData(run);
   if (data.length < 3) return null;
   return (
     <div className="flex flex-col gap-1">
-      <Label className="!text-[8px]">ATO-uppfyllnad över tid (%)</Label>
+      <Label className="!text-[8px]">{t("cmp.chartFulfilment")}</Label>
       <div style={{ height: 96 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>
@@ -317,11 +300,12 @@ function FulfilmentChart({ run }: { run: PairedRun }) {
 }
 
 function WaitChart({ run }: { run: PairedRun }) {
+  const { t } = useLang();
   const data = chartData(run);
   if (data.length < 3) return null;
   return (
     <div className="flex flex-col gap-1">
-      <Label className="!text-[8px]">Ackumulerad undvikbar väntetid (fpl-h) — lägre är bättre</Label>
+      <Label className="!text-[8px]">{t("cmp.chartWait")}</Label>
       <div style={{ height: 88 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 6, bottom: 0, left: -22 }}>

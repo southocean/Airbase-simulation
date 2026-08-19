@@ -2,32 +2,7 @@ import { AlertTriangle, Plane, Wrench } from "lucide-react";
 import { AIRCRAFT_SPECS, SERVICE_INTERVAL_HOURS } from "@/sim/params";
 import type { Aircraft, AircraftStatus, SimState } from "@/sim/types";
 import { Card, Chip, Label, Meter, toneStyle, TONE_HSL, type Tone } from "./primitives";
-
-const STATUS_LABEL: Record<AircraftStatus, string> = {
-  ready: "KLAR",
-  allocated: "TILLDELAD",
-  in_preparation: "KLARGÖRING",
-  awaiting_launch: "STARTKLAR",
-  on_mission: "UPPDRAG",
-  returning: "ÅTERFLYG",
-  recovering: "MOTTAGNING",
-  under_maintenance: "UNDERHÅLL",
-  unavailable: "EJ TILLGÄNGLIG",
-};
-
-/** Explicit abbreviations for the header tally. Slicing the full labels collided:
- *  both "KLAR" (ready) and "KLARGÖRING" (in preparation) truncate to "KLAR". */
-const STATUS_SHORT: Record<AircraftStatus, string> = {
-  ready: "KLAR",
-  allocated: "TILLD",
-  in_preparation: "KLARG",
-  awaiting_launch: "STARTKL",
-  on_mission: "UPPDR",
-  returning: "ÅTERFL",
-  recovering: "MOTTAG",
-  under_maintenance: "UH",
-  unavailable: "EJ TILLG",
-};
+import { useLang } from "@/i18n/LangContext";
 
 const STATUS_TONE: Record<AircraftStatus, Tone> = {
   ready: "green",
@@ -56,6 +31,7 @@ const STATUS_ORDER: AircraftStatus[] = [
 ];
 
 export function FleetPanel({ state }: { state: SimState }) {
+  const { t } = useLang();
   const sorted = [...state.aircraft].sort(
     (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || a.tail.localeCompare(b.tail),
   );
@@ -67,7 +43,7 @@ export function FleetPanel({ state }: { state: SimState }) {
 
   return (
     <Card
-      title="Flygplansflotta"
+      title={t("fleet.panel")}
       right={
         <div className="flex items-center gap-1 flex-wrap justify-end">
           {counts.map(({ status, n }) => (
@@ -79,9 +55,9 @@ export function FleetPanel({ state }: { state: SimState }) {
                 color: "white",
                 border: `1px solid hsl(${TONE_HSL[STATUS_TONE[status]]} / 0.5)`,
               }}
-              title={STATUS_LABEL[status]}
+              title={t(`status.${status}`)}
             >
-              {n} {STATUS_SHORT[status]}
+              {n} {t(`short.${status}`)}
             </span>
           ))}
         </div>
@@ -99,6 +75,7 @@ export function FleetPanel({ state }: { state: SimState }) {
 }
 
 function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
+  const { t, tm } = useLang();
   const tone = STATUS_TONE[ac.status];
   const spec = AIRCRAFT_SPECS[ac.type];
   const svcFrac = ac.hoursToService / SERVICE_INTERVAL_HOURS;
@@ -141,7 +118,7 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
         </span>
         <span className="text-[9px] font-mono opacity-45 truncate">{spec.label}</span>
         <div className="flex-1" />
-        <Chip tone={tone}>{STATUS_LABEL[ac.status]}</Chip>
+        <Chip tone={tone}>{t(`status.${ac.status}`)}</Chip>
       </div>
 
       {/* Current activity + progress */}
@@ -153,7 +130,7 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
           className="text-[9px] font-mono truncate flex-1"
           style={{ color: blocked ? `hsl(${TONE_HSL.red})` : "hsl(218 15% 42%)" }}
         >
-          {ac.activity ?? "På platta"}
+          {ac.activity ? tm(ac.activity) : t("fleet.onApron")}
         </span>
         {ac.activityEndsAt !== null && (
           <span className="text-[9px] font-mono tnum opacity-55 shrink-0">
@@ -166,15 +143,15 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
 
       {/* Airframe vitals */}
       <div className="grid grid-cols-3 gap-1.5">
-        <Vital label="SKICK" value={`${ac.health.toFixed(0)}`} unit="%" frac={ac.health / 100} />
+        <Vital label={t("fleet.health")} value={`${ac.health.toFixed(0)}`} unit="%" frac={ac.health / 100} />
         <Vital
-          label="T. SERVICE"
+          label={t("fleet.toService")}
           value={ac.hoursToService.toFixed(1)}
           unit="h"
           frac={svcFrac}
           tone={svcTone}
         />
-        <Vital label="FLYGTID" value={ac.flightHours.toFixed(0)} unit="h" frac={null} />
+        <Vital label={t("fleet.flightHours")} value={ac.flightHours.toFixed(0)} unit="h" frac={null} />
       </div>
 
       {ac.deferredDefects.length > 0 && (
@@ -187,9 +164,9 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
                 (d.deferUntilHours ?? Infinity) - state.hours < 12 ? "red" : "amber",
                 { bg: 0.13, border: 0.3 },
               )}
-              title={`${d.label} — måste åtgärdas inom ${Math.max(0, (d.deferUntilHours ?? 0) - state.hours).toFixed(0)} h`}
+              title={t("fleet.deferredTitle", { label: t(d.label), h: Math.max(0, (d.deferUntilHours ?? 0) - state.hours).toFixed(0) })}
             >
-              UPPSKJUTEN {Math.max(0, (d.deferUntilHours ?? 0) - state.hours).toFixed(0)}h
+              {t("fleet.deferred", { h: Math.max(0, (d.deferUntilHours ?? 0) - state.hours).toFixed(0) })}
             </span>
           ))}
         </div>
@@ -197,7 +174,7 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
 
       {ac.avoidableWaitHours > 0.25 && (
         <div className="flex items-center justify-between text-[9px] font-mono">
-          <span className="opacity-45">Undvikbar väntan</span>
+          <span className="opacity-45">{t("fleet.avoidableWait")}</span>
           <span className="tnum font-bold" style={{ color: `hsl(${TONE_HSL.amber})` }}>
             {ac.avoidableWaitHours.toFixed(1)} h
           </span>
