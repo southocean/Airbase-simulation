@@ -2,7 +2,7 @@ import { useState } from "react";
 import { LangProvider, useLang } from "./i18n/LangContext";
 import { useSimulation } from "./ui/useSimulation";
 import { TopBar } from "./ui/TopBar";
-import { BaseScene } from "./ui/BaseScene";
+import { BaseCanvas } from "./ui/BaseCanvas";
 import { FleetPanel } from "./ui/FleetPanel";
 import { EnvPanel } from "./ui/EnvPanel";
 import { ResourcePanel, MissionQueue } from "./ui/ResourcePanel";
@@ -86,7 +86,7 @@ function Shell() {
           {tab === "scene" && (
             <>
               <div className="flex-1 min-h-0">
-                <BaseScene state={state} selected={selected} onSelect={setSelected} />
+                <BaseCanvas state={state} selected={selected} onSelect={setSelected} />
               </div>
               <div className="shrink-0 grid grid-cols-1 md:grid-cols-2 gap-2" style={{ height: "34%" }}>
                 <MissionQueue state={state} />

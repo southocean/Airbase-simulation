@@ -81,23 +81,14 @@ function AircraftCard({ ac, state }: { ac: Aircraft; state: SimState }) {
   const svcFrac = ac.hoursToService / SERVICE_INTERVAL_HOURS;
   const svcTone: Tone = svcFrac < 0.05 ? "red" : svcFrac < 0.15 ? "amber" : "green";
 
-  // Progress through the current timed activity.
+  // Progress through the current timed activity — now exact, since the sim
+  // records when the activity began rather than only when it ends.
   let progress: number | null = null;
-  if (ac.activityEndsAt !== null && ac.job === null) {
-    // We do not store the activity start, so infer from the remaining time
-    // against a nominal duration — good enough for a progress affordance.
-    const remain = Math.max(0, ac.activityEndsAt - state.hours);
-    const nominalHours =
-      ac.status === "in_preparation"
-        ? 0.75
-        : ac.status === "recovering"
-          ? 0.5
-          : ac.status === "on_mission"
-            ? 1.5
-            : 0.3;
-    progress = Math.max(0, Math.min(1, 1 - remain / nominalHours));
-  } else if (ac.job && ac.job.totalHours > 0) {
+  if (ac.job && ac.job.totalHours > 0) {
     progress = Math.min(1, ac.job.doneHours / ac.job.totalHours);
+  } else if (ac.activityEndsAt !== null && ac.activityStartedAt !== null) {
+    const span = ac.activityEndsAt - ac.activityStartedAt;
+    progress = span > 0 ? Math.max(0, Math.min(1, (state.hours - ac.activityStartedAt) / span)) : null;
   }
 
   const blocked = ac.status === "unavailable" && ac.job?.blockedBy;

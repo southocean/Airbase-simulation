@@ -38,6 +38,10 @@ export interface AircraftSpec {
   munitionsPerSortie: number;
   /** Maintenance man-hours per flight hour */
   mmhPerFh: number;
+  /** Cruise speed, knots. Presentation only — the sim models time, not distance. */
+  cruiseKts: number;
+  /** Typical operating radius, km. Bounds how far a mission track reaches. */
+  radiusKm: number;
   /** Crosswind limit, knots */
   crosswindLimitKts: number;
   /** Minimum ceiling, ft, and visibility, m, for a normal launch */
@@ -71,6 +75,8 @@ export const AIRCRAFT_SPECS: Record<AircraftTypeId, AircraftSpec> = {
     fuelM3: 3.4,
     munitionsPerSortie: 2,
     mmhPerFh: 8.5,
+    cruiseKts: 470,
+    radiusKm: 700,
     crosswindLimitKts: 25,
     minCeilingFt: 400,
     minVisibilityM: 1200,
@@ -86,6 +92,8 @@ export const AIRCRAFT_SPECS: Record<AircraftTypeId, AircraftSpec> = {
     fuelM3: 3.8,
     munitionsPerSortie: 2,
     mmhPerFh: 11,
+    cruiseKts: 450,
+    radiusKm: 650,
     crosswindLimitKts: 25,
     minCeilingFt: 400,
     minVisibilityM: 1200,
@@ -101,6 +109,8 @@ export const AIRCRAFT_SPECS: Record<AircraftTypeId, AircraftSpec> = {
     fuelM3: 9.5,
     munitionsPerSortie: 0,
     mmhPerFh: 6,
+    cruiseKts: 350,
+    radiusKm: 900,
     crosswindLimitKts: 30,
     minCeilingFt: 300,
     minVisibilityM: 800,

@@ -77,6 +77,9 @@ export interface Aircraft {
   munitions: number;
   /** Sim-hour at which the current activity completes */
   activityEndsAt: number | null;
+  /** Sim-hour at which it began. Needed to know how far through it is, which the
+   *  UI previously had to guess from a nominal duration. */
+  activityStartedAt: number | null;
   /** Current activity as a structured message. */
   activity: Msg | null;
   /** Which prep slot / bay index is held, if any */

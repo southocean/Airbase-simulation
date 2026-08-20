@@ -62,6 +62,10 @@ const EN: Dict = {
   "scene.launchBan": "LAUNCH SUSPENDED",
   "scene.wind": "WIND {dir}° / {kts} kt",
   "scene.legend": "Click an aircraft to follow it",
+  "scene.offMap": "off map",
+  "scene.wideArea": "WIDE AREA · {km} KM",
+  "scene.runwayCount": "{n} RUNWAY(S)",
+  "scene.rangeBearing": "{km} km out · brg {brg}°",
   "scene.queue": "AWAITING CAPACITY",
 
   // ── weather panel ────────────────────────────────────────────────────────
@@ -400,6 +404,10 @@ const SV: Dict = {
   "scene.launchBan": "STARTFÖRBUD",
   "scene.wind": "VIND {dir}° / {kts} kt",
   "scene.legend": "Klicka på ett flygplan för att följa det",
+  "scene.offMap": "utanför kartan",
+  "scene.wideArea": "OMRÅDE · {km} KM",
+  "scene.runwayCount": "{n} BANA/BANOR",
+  "scene.rangeBearing": "{km} km ut · bäring {brg}°",
   "scene.queue": "VÄNTAR PÅ KAPACITET",
 
   "wx.panel": "Väder & ljus",

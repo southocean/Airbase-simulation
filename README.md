@@ -142,6 +142,20 @@ src/ui/           React; samples sim state, never drives it
 
 The one-way dependency matters: `sim` knows nothing about `ui`, and `policy` acts on the world only through the same actions a human has. If the tool could reach into state directly, any measured advantage would be meaningless.
 
+## The live view
+
+The default tab is a canvas-rendered top-down airfield.
+
+**Canvas, not SVG.** The first version mutated a `transform` attribute per aircraft per frame plus ~150 precipitation nodes. Each write invalidates layout and style for that element and the browser recomputes a retained scene graph it has no reason to keep — that was the lag. Canvas draws an immediate-mode frame with no retained nodes. The static airfield is cached in an offscreen canvas and blitted, so per-frame work is only the moving parts.
+
+**Runway count is real.** It comes from `BASE_CAPACITY`, which is deck-derived: huvudbas 2, sidobas 1, reservbas 1. That number sat in the data unread for several revisions while the scene drew one runway regardless. Aircraft are assigned a runway and roll along it on takeoff and landing. It is still not an engine *constraint* — the simulation does not limit simultaneous runway operations, and making it binding would change the measured results, so that is a separate step.
+
+**Aircraft leave.** They depart along a stable outbound bearing, run out to their operating radius, and return — they do not orbit in view. A Gripen sortie at ~470 kt covers far more than the 320 km the minimap shows, so most of a mission is spent off both maps. Off-map aircraft are not drawn; the simulation keeps running them, and the minimap counts them.
+
+**Minimap** bottom-right: 320 km radius with range rings, the base-view footprint as a gold box, and a counter for aircraft beyond the edge.
+
+Everything drawn is derived from sim state by a pure function (`src/ui/scene/world.ts`). It consumes no RNG and feeds nothing back, so determinism is untouched — same state, same picture. That is asserted in the tests, along with the departure profile actually leaving the drawn area.
+
 ## Language
 
 English by default, with a Swedish toggle in the top bar (the domain vocabulary is Swedish; the audience is not necessarily). The choice persists in localStorage.

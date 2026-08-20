@@ -360,6 +360,7 @@ function raiseJob(
   ac.status = "unavailable";
   ac.activity = msg("act.waiting", { what: job.label });
   ac.activityEndsAt = null;
+  ac.activityStartedAt = null;
 }
 
 /** Turn an Utfall row into a job, rolling the deck's T++ extra-time table. */
@@ -466,6 +467,7 @@ function beginMaintenance(state: SimState, ac: Aircraft): void {
   job.blockedBy = undefined;
   ac.status = "under_maintenance";
   ac.activity = msg(job.label);
+  ac.activityStartedAt = state.hours;
   ac.activityEndsAt = state.hours + (job.totalHours - job.doneHours);
 }
 
@@ -541,6 +543,7 @@ function stepAircraft(state: SimState, dt: number): void {
           ac.status = "ready";
           ac.activity = null;
           ac.activityEndsAt = null;
+          ac.activityStartedAt = null;
           logEvent(state, "ok", "maintenance", msg("ev.maintDone", { tail: ac.tail, label: job.label, hours: job.totalHours.toFixed(1) }));
         }
         break;
@@ -600,6 +603,7 @@ function stepAircraft(state: SimState, dt: number): void {
 
         ac.status = "in_preparation";
         ac.activity = msg("act.turnaround");
+        ac.activityStartedAt = state.hours;
         ac.activityEndsAt = state.hours + mins / 60;
         break;
       }
@@ -648,6 +652,7 @@ function stepAircraft(state: SimState, dt: number): void {
           ac.status = "awaiting_launch";
           ac.activity = msg("act.readyToLaunch");
           ac.activityEndsAt = null;
+          ac.activityStartedAt = state.hours;
         }
         break;
       }
@@ -662,6 +667,7 @@ function stepAircraft(state: SimState, dt: number): void {
         const dur = sampleDuration(s.sortieHours, durRng, 0.3);
         ac.status = "on_mission";
         ac.activity = msg("act.mission");
+        ac.activityStartedAt = state.hours;
         ac.activityEndsAt = state.hours + dur;
         ac.sorties++;
         state.kpi.sortiesFlown++;
@@ -677,6 +683,7 @@ function stepAircraft(state: SimState, dt: number): void {
         if (ac.activityEndsAt !== null && state.hours >= ac.activityEndsAt) {
           ac.status = "returning";
           ac.activity = msg("act.returnFlight");
+          ac.activityStartedAt = state.hours;
           ac.activityEndsAt = state.hours + 0.25;
         } else {
           // Error class 1: technical failure in flight, as a proper hazard rate.
@@ -691,6 +698,7 @@ function stepAircraft(state: SimState, dt: number): void {
             logEvent(state, "warning", "maintenance", msg("ev.airFail", { tail: ac.tail }));
             ac.status = "returning";
             ac.activity = msg("act.emergencyReturn");
+            ac.activityStartedAt = state.hours;
             ac.activityEndsAt = state.hours + 0.2;
           }
         }
@@ -715,6 +723,7 @@ function stepAircraft(state: SimState, dt: number): void {
           ac.munitions = 0;
           ac.status = "recovering";
           ac.activity = msg("act.reception");
+          ac.activityStartedAt = state.hours;
           ac.activityEndsAt = state.hours + (sampleDuration(s.receptionMinutes, durRng, 6) * prepEnvMultiplier(state)) / 60;
 
           const m = state.missions.find((x) => x.id === ac.missionId);
@@ -755,6 +764,7 @@ function stepAircraft(state: SimState, dt: number): void {
             ac.status = "ready";
             ac.activity = null;
             ac.activityEndsAt = null;
+            ac.activityStartedAt = null;
             if (ac.lastLandingAt !== null) {
               state.kpi.turnaroundSum += state.hours - ac.lastLandingAt;
               state.kpi.turnaroundCount++;
@@ -783,6 +793,7 @@ function stepAircraft(state: SimState, dt: number): void {
             ac.status = "ready";
             ac.activity = null;
             ac.activityEndsAt = null;
+            ac.activityStartedAt = null;
             if (ac.lastLandingAt !== null) {
               const ta = state.hours - ac.lastLandingAt;
               state.kpi.turnaroundSum += ta;

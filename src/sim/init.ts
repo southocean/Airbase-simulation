@@ -84,6 +84,7 @@ export function createSim(config: SimConfig): SimState {
         fuel: setupRng.range(0.5, 1),
         munitions: 0,
         activityEndsAt: null,
+        activityStartedAt: null,
         activity: null,
         slot: null,
         bay: null,
